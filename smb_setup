@@ -1,0 +1,128 @@
+Для реализации файлового сервера можно использовать либо SMB (Server Message Block), либо NFS (Network File System). В данном случае целесообразнее выбрать SMB, так как он предоставляет более гибкую и удобную систему управления доступом на уровне пользователей и интеграцию с доменными службами, такими как Active Directory, что важно для обеспечения безопасности и контроля доступа.
+
+### Установка и настройка SMB сервера
+
+1. **Установка Samba**
+   ```bash
+   sudo apt update
+   sudo apt install samba
+   ```
+
+2. **Настройка конфигурационного файла Samba**
+   Откройте файл конфигурации Samba:
+   ```bash
+   sudo nano /etc/samba/smb.conf
+   ```
+
+   Добавьте следующие секции для каждой общей папки:
+   ```ini
+   [Branch_Files]
+   path = /srv/samba/Branch_Files
+   valid users = branch_admin
+   read only = no
+
+   [Network]
+   path = /srv/samba/Network
+   valid users = network_admin
+   read only = no
+
+   [Admin_Files]
+   path = /srv/samba/Admin_Files
+   valid users = admin
+   read only = no
+   ```
+
+3. **Создайте директории для общих папок и установите права доступа**
+   ```bash
+   sudo mkdir -p /srv/samba/Branch_Files /srv/samba/Network /srv/samba/Admin_Files
+   sudo chown branch_admin:branch_admin /srv/samba/Branch_Files
+   sudo chown network_admin:network_admin /srv/samba/Network
+   sudo chown admin:admin /srv/samba/Admin_Files
+   ```
+
+4. **Добавьте пользователей в Samba**
+   ```bash
+   sudo smbpasswd -a branch_admin
+   sudo smbpasswd -a network_admin
+   sudo smbpasswd -a admin
+   ```
+
+5. **Перезапустите службу Samba**
+   ```bash
+   sudo systemctl restart smbd
+   ```
+
+### Настройка автоматического монтирования на клиентах
+
+На клиентах необходимо настроить автоматическое монтирование доступных папок при входе пользователя в систему. Для этого можно использовать файл `/etc/fstab` и скрипты для PAM (Pluggable Authentication Modules).
+
+1. **Установите необходимые пакеты**
+   ```bash
+   sudo apt update
+   sudo apt install cifs-utils
+   ```
+
+2. **Создайте директории для монтирования**
+   ```bash
+   sudo mkdir -p /mnt/Branch_Files /mnt/Network /mnt/Admin_Files
+   ```
+
+3. **Настройте файл `/etc/fstab` для автоматического монтирования**
+   Добавьте следующие строки в файл `/etc/fstab`:
+   ```fstab
+   //HQ-SRV/Branch_Files /mnt/Branch_Files cifs credentials=/etc/samba/branch_admin_credentials,uid=branch_admin,gid=branch_admin 0 0
+   //HQ-SRV/Network /mnt/Network cifs credentials=/etc/samba/network_admin_credentials,uid=network_admin,gid=network_admin 0 0
+   //HQ-SRV/Admin_Files /mnt/Admin_Files cifs credentials=/etc/samba/admin_credentials,uid=admin,gid=admin 0 0
+   ```
+
+4. **Создайте файлы с учетными данными для каждой папки**
+   ```bash
+   sudo nano /etc/samba/branch_admin_credentials
+   ```
+   Содержимое файла:
+   ```
+   username=branch_admin
+   password=YOUR_PASSWORD
+   domain=YOUR_DOMAIN
+   ```
+
+   ```bash
+   sudo nano /etc/samba/network_admin_credentials
+   ```
+   Содержимое файла:
+   ```
+   username=network_admin
+   password=YOUR_PASSWORD
+   domain=YOUR_DOMAIN
+   ```
+
+   ```bash
+   sudo nano /etc/samba/admin_credentials
+   ```
+   Содержимое файла:
+   ```
+   username=admin
+   password=YOUR_PASSWORD
+   domain=YOUR_DOMAIN
+   ```
+
+   Установите права доступа к этим файлам:
+   ```bash
+   sudo chmod 600 /etc/samba/*_credentials
+   ```
+
+5. **Настройте PAM для монтирования при входе пользователя**
+   Откройте файл `/etc/pam.d/common-session` и добавьте следующую строку:
+   ```pam
+   session optional pam_exec.so /etc/security/mount_smb_shares.sh
+   ```
+
+6. **Создайте скрипт для монтирования доступных папок**
+   Создайте файл `/etc/security/mount_smb_shares.sh`:
+   ```bash
+   sudo nano /etc/security/mount_smb_shares.sh
+   ```
+
+   Содержимое файла:
+   ```bash
+   #!/bin
