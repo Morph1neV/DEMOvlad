@@ -1,0 +1,95 @@
+#!/bin/bash
+setname="moodle.vm.dom"
+namer="moodle"
+addr4="10.10.13.14"
+
+#apt-get update
+#apt-get install -y apache2 apache2-{base,httpd-prefork,mod_php8.0,mods}
+#apt-get install -y php8.0 php8.0-{curl,fileinfo,fpm-fcgi,gd,intl,ldap,mbstring,mysqlnd,mysqlnd-#mysqli,opcache,soap,sodium,xmlreader,xmlrpc,zip,openssl}
+
+cd /root/
+
+read -p 'Start configuring? [yes/no]: ' input
+if [[ "$input" = "no" ]]; then
+    echo "Exitting.."
+    return 1 2>/dev/null
+    exit 1
+fi
+
+systemctl enable --now httpd2
+#apt-get install -y MySQL-server
+systemctl enable --now mysqld
+systemctl status mysqld --no-pager
+
+read -p "Press any key to create DB.. " -n1 -s
+
+# Подключаемся к MySQL и выполняем команды
+mysql << EOF
+CREATE DATABASE moodle DEFAULT CHARACTER SET utf8 COLLATE utf8_unicode_ci;
+CREATE USER 'moodle'@'localhost' IDENTIFIED WITH mysql_native_password BY 'moodle';
+GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,CREATE TEMPORARY TABLES,DROP,INDEX,ALTER ON moodle.* TO 'moodle'@'localhost';
+EXIT
+
+EOF
+
+read -p "Press any key to install git and clone.. " -n1 -s
+
+#apt-get install -y git
+#git clone git://git.moodle.org/moodle.git
+read -p "Press any key to continue.. " -n1 -s
+cd moodle
+git branch -a
+git branch --track MOODLE_403_STABLE origin/MOODLE_403_STABLE
+echo press q
+git checkout MOODLE_403_STABLE
+
+read -p "Check. Press any key to configure web-service.. " -n1 -s
+cd ../
+mv moodle /var/www/html/
+mkdir /var/moodledata
+chown -R apache2 /var/moodledata
+chmod -R 777 /var/moodledata
+chmod -R 0755 /var/www/html/moodle
+chown -R apache2:apache2 /var/www/html/moodle
+
+cat > /etc/httpd2/conf/sites-available/moodle.conf << EOF
+<VirtualHost *:80>
+	ServerName vm.dom
+	ServerAlias moodle.vm.dom
+	DocumentRoot /var/www/html/moodle
+	<Directory "/var/www/html/moodle">
+		AllowOverride All
+		Options -Indexes +FollowSymLinks
+	</Directory>
+</VirtualHost>
+EOF
+ln -s /etc/httpd2/conf/sites-available/moodle.conf /etc/httpd2/conf/sites-enabled/
+
+read -p "Check. Press any key to test the config.. " -n1 -s
+/usr/sbin/apachectl configtest
+read -p "Check. Press any key to continue.. " -n1 -s
+sed -i "s/; max_input_vars = 1000/max_input_vars = 5000/g" /etc/php/8.0/apache2-mod_php/php.ini
+systemctl restart httpd2
+
+echo -e "${addr4}\t${setname} ${namer}" >> /etc/hosts
+
+read -p '<Go to http://moodle.vm.dom[/install.php]>' input
+
+#Каталог данных /var/moodledata
+#Название БД moodle
+#Пользователь БД moodle
+#Пароль moodle
+#порт 3306
+#Полное название сайта - номер места
+#Краткое название сайта moodle
+#Далее администрирование-Пользователи-Глобальные группы-Добавить глобальную группу (создать по таблице)
+#Далее администрирование-Список пользователей-Добавить пользователя (по таблице)
+#Добавить участников в группы
+
+#if [[ "$input" = "no" ]]; then
+#    echo "Exitting.."
+#    return 1 2>/dev/null
+#    exit 1
+#fi
+#apt-get install -y php8.0-gd
+#apt-get install -y php8.0-sodium
