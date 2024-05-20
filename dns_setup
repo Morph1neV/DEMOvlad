@@ -1,0 +1,82 @@
+Установка BIND
+
+1. Установите BIND, если он еще не установлен:
+   sudo apt-get update
+   sudo apt-get install bind9 bind9utils bind9-doc
+
+Настройка зоны `hq.work`
+
+2. Создайте файл зоны для `hq.work`. Обычно файлы зон находятся в `/etc/bind` или `/var/named`:
+   sudo nano /etc/bind/db.hq.work
+
+3. Вставьте следующий контент в файл зоны, заменив `ns1.hq.work` и `mail.hq.work` на ваши реальные данные:
+   $TTL 86400
+   @   IN  SOA ns1.hq.work. admin.hq.work. (
+               2023101001 ; Serial
+               3600       ; Refresh
+               1800       ; Retry
+               1209600    ; Expire
+               86400 )    ; Minimum TTL
+
+       IN  NS      ns1.hq.work.
+       IN  MX 10   mail.hq.work.
+
+   ns1 IN  A       192.168.1.1
+   mail IN  A       192.168.1.2
+   www  IN  A       192.168.1.3
+
+Настройка обратной зоны
+
+4. Создайте файл обратной зоны. Обычно файлы обратных зон находятся в том же каталоге, что и файлы прямых зон:
+   sudo nano /etc/bind/db.192.168.1
+
+5. Вставьте следующий контент в файл обратной зоны:
+   $TTL 86400
+   @   IN  SOA ns1.hq.work. admin.hq.work. (
+               2023101001 ; Serial
+               3600       ; Refresh
+               1800       ; Retry
+               1209600    ; Expire
+               86400 )    ; Minimum TTL
+
+       IN  NS      ns1.hq.work.
+
+   1   IN  PTR     ns1.hq.work.
+   2   IN  PTR     mail.hq.work.
+   3   IN  PTR     www.hq.work.
+
+Конфигурация BIND
+
+6. Откройте главный конфигурационный файл BIND:
+   sudo nano /etc/bind/named.conf.local
+
+7. Добавьте конфигурацию для ваших зон:
+   zone "hq.work" {
+       type master;
+       file "/etc/bind/db.hq.work";
+   };
+
+   zone "1.168.192.in-addr.arpa" {
+       type master;
+       file "/etc/bind/db.192.168.1";
+   };
+
+Перезапуск службы BIND
+
+8. Проверьте конфигурацию на наличие ошибок:
+   sudo named-checkconf
+
+9. Проверьте файлы зон на наличие ошибок:
+   sudo named-checkzone hq.work /etc/bind/db.hq.work
+   sudo named-checkzone 1.168.192.in-addr.arpa /etc/bind/db.192.168.1
+
+10. Перезапустите BIND для применения изменений:
+    sudo systemctl restart bind9
+
+Проверка работы DNS-сервера
+
+11. Используйте команды `dig` или `nslookup` для проверки работы DNS-сервера:
+    dig @localhost hq.work
+    dig @localhost -x 192.168.1.1
+
+Если у вас есть дополнительные таблицы с именами и типами записей, просто добавьте их в соответствующие файлы зон.
