@@ -1,0 +1,12 @@
+/sbin/iptables -t nat -A POSTROUTING -s 0.0.0.0/0 -o <имя_интерфейса> -j MASQUERADE
+
+reboot /sbin/iptables-restore < /root/iptables-export
+
+Делаете правила iptables
+потом
+iptables-save > /root/iptables-export (любое имя и путь)
+потом 
+export EDITOR=nano
+crontab -e
+пишите туда команду со скрина, сохраняете Ctrl + O, Enter, Ctrl + X
+Даже крон можно не перезапускать
