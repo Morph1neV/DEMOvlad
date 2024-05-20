@@ -1,0 +1,152 @@
+Чтобы выполнить настройку веб-сервера Apache с использованием MySQL и создать пользователей с заданными паролями на дистрибутиве Альт Линукс, следуйте следующим шагам:
+
+### 1. Установка Apache и MySQL
+
+1. **Установите Apache и MySQL:**
+
+```bash
+sudo apt-get update
+sudo apt-get install apache2 mysql-server php php-mysql
+```
+
+2. **Запустите и настройте Apache и MySQL для автоматического запуска при загрузке системы:**
+
+```bash
+sudo systemctl start apache2
+sudo systemctl enable apache2
+
+sudo systemctl start mysql
+sudo systemctl enable mysql
+```
+
+### 2. Настройка Apache
+
+1. **Настройте виртуальный хост Apache:**
+
+Создайте файл конфигурации для вашего виртуального хоста, например, `/etc/apache2/sites-available/lms.conf`:
+
+```bash
+sudo nano /etc/apache2/sites-available/lms.conf
+```
+
+Добавьте в файл следующую конфигурацию:
+
+```apache
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot /var/www/lms
+
+    <Directory /var/www/lms>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog ${APACHE_LOG_DIR}/error.log
+    CustomLog ${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+```
+
+2. **Активируйте новый виртуальный хост и перезапустите Apache:**
+
+```bash
+sudo a2ensite lms.conf
+sudo systemctl reload apache2
+```
+
+3. **Создайте директорию для вашего сайта и добавьте файл `index.php` с номером места:**
+
+```bash
+sudo mkdir -p /var/www/lms
+sudo nano /var/www/lms/index.php
+```
+
+Добавьте в файл `index.php` содержимое:
+
+```php
+<?php
+echo "Номер места: 123"; // Замените 123 на ваш номер места
+?>
+```
+
+### 3. Настройка MySQL
+
+1. **Создайте базу данных и пользователей:**
+
+```bash
+sudo mysql -u root -p
+```
+
+В MySQL выполните следующие команды:
+
+```sql
+CREATE DATABASE lms;
+
+CREATE USER 'Admin'@'localhost' IDENTIFIED BY 'P@ssw0rd';
+GRANT ALL PRIVILEGES ON lms.* TO 'Admin'@'localhost' WITH GRANT OPTION;
+
+CREATE USER 'Manager1'@'localhost' IDENTIFIED BY 'P@ssw0rd';
+GRANT SELECT, INSERT, UPDATE, DELETE ON lms.* TO 'Manager1'@'localhost';
+
+CREATE USER 'Manager2'@'localhost' IDENTIFIED BY 'P@ssw0rd';
+GRANT SELECT, INSERT, UPDATE, DELETE ON lms.* TO 'Manager2'@'localhost';
+
+-- Повторите для всех других пользователей
+FLUSH PRIVILEGES;
+EXIT;
+```
+
+### 4. Настройка безопасности
+
+1. **Настройте брандмауэр для разрешения трафика на порту 80 (HTTP):**
+
+```bash
+sudo ufw allow 80/tcp
+sudo ufw reload
+```
+
+2. **Настройте права доступа к директориям:**
+
+```bash
+sudo chown -R www-data:www-data /var/www/lms
+sudo chmod -R 755 /var/www/lms
+```
+
+### 5. Тестирование
+
+1. **Проверьте доступность вашего сайта:**
+
+Откройте браузер и введите IP-адрес вашего сервера. Вы должны увидеть сообщение с номером места.
+
+2. **Проверьте подключение к базе данных:**
+
+Создайте тестовый скрипт для проверки подключения к базе данных:
+
+```bash
+sudo nano /var/www/lms/test_db.php
+```
+
+Добавьте в файл `test_db.php` содержимое:
+
+```php
+<?php
+$servername = "localhost";
+$username = "Admin";
+$password = "P@ssw0rd";
+$dbname = "lms";
+
+$conn = new mysqli($servername, $username, $password, $dbname);
+
+if ($conn->connect_error) {
+    die("Connection failed: " . $conn->connect_error);
+}
+echo "Connected successfully";
+$conn->close();
+?>
+```
+
+Откройте в браузере `http://<ваш_сервер>/test_db.php` и убедитесь, что подключение успешно.
+
+### Заключение
+
+Теперь у вас должен быть настроен веб-сервер Apache с базой данных MySQL на Альт Линукс, и пользователи с заданными паролями должны быть созданы.
